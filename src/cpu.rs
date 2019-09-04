@@ -15,7 +15,7 @@ pub enum Register {
     VC = 12,
     VD = 13,
     VE = 14,
-    VF = 15
+    VF = 15,
 }
 
 #[cfg(test)]
