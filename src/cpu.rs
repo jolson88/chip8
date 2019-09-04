@@ -1,49 +1,21 @@
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Primitive)]
 pub enum Register {
-    V0,
-    V1,
-    V2,
-    V3,
-    V4,
-    V5,
-    V6,
-    V7,
-    V8,
-    V9,
-    VA,
-    VB,
-    VC,
-    VD,
-    VE,
-    VF
-}
-
-// TODO: This is pretty much a hack until FromPrimitive is brought into stable
-// (it's currently experimental at this time of writing).
-pub fn register_from_u8(val: u8) -> Register {
-    match val {
-        0 => Register::V0,
-        1 => Register::V1,
-        2 => Register::V2,
-        3 => Register::V3,
-        4 => Register::V4,
-        5 => Register::V5,
-        6 => Register::V6,
-        7 => Register::V7,
-        8 => Register::V8,
-        9 => Register::V9,
-        10 => Register::VA,
-        11 => Register::VB,
-        12 => Register::VC,
-        13 => Register::VD,
-        14 => Register::VE,
-        15 => Register::VF,
-        _ => {
-            // Trying to parse a register value for anything over 15 is a programming error.
-            // Fail fast!
-            panic!("Invalid register value");
-        }
-    }
+    V0 = 0,
+    V1 = 1,
+    V2 = 2,
+    V3 = 3,
+    V4 = 4,
+    V5 = 5,
+    V6 = 6,
+    V7 = 7,
+    V8 = 8,
+    V9 = 9,
+    VA = 10,
+    VB = 11,
+    VC = 12,
+    VD = 13,
+    VE = 14,
+    VF = 15
 }
 
 #[cfg(test)]
