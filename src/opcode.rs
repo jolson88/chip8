@@ -5,11 +5,13 @@ use std::convert::From;
 /// Represents different opcodes that the Chip-8 can execute.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Opcode {
-    /// **Dxyn - DRW Vx, Vy, nibble**. Displays n-byte sprite starting at memory location I at (Vx, Vy).
+    /// *2nnn - CALL addr. Calls subroutine at nnn.
+    CallSubroutine(u16),
+    /// *Dxyn - DRW Vx, Vy, nibble*. Displays n-byte sprite starting at memory location I at (Vx, Vy).
     DisplaySprite(Register, Register, u8),
-    /// **Annn - LD I, addr**. Sets the value of I register to nnn.
+    /// *Annn - LD I, addr*. Sets the value of I register to nnn.
     LoadAddress(u16),
-    /// **6xkk - LD Vx, byte**. Puts the value kk into register Vx.
+    /// *6xkk - LD Vx, byte*. Puts the value kk into register Vx.
     LoadConstant(Register, u8),
 }
 
@@ -19,6 +21,10 @@ impl From<u16> for Opcode {
         // We can use the top 4-bits of the opcode as a switch into the type of opcode for easier parsing
         let opcode_switch = inst >> 12;
         match opcode_switch {
+            0x2 => {
+                // 2nnn
+                Opcode::CallSubroutine(inst & 0xFFF)
+            },
             0x6 => {
                 // 6xkk
                 let r = (inst >> 8) & 0x0F;
@@ -53,6 +59,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_draw_opcodes() {
+        assert_eq!(
+            Opcode::DisplaySprite(Register::VA, Register::VB, 0x6),
+            Opcode::from(0xDAB6)
+        );
+    }
+
+    #[test]
+    fn parses_flow_opcodes() {
+        assert_eq!(
+            Opcode::CallSubroutine(0x2D4),
+            Opcode::from(0x22D4)
+        );
+    }
+
+    #[test]
     fn parses_load_opcodes() {
         assert_eq!(
             Opcode::LoadConstant(Register::VA, 0x02),
@@ -63,13 +85,5 @@ mod tests {
             Opcode::from(0x60FF)
         );
         assert_eq!(Opcode::LoadAddress(0x2EA), Opcode::from(0xA2EA));
-    }
-
-    #[test]
-    fn parses_draw_opcodes() {
-        assert_eq!(
-            Opcode::DisplaySprite(Register::VA, Register::VB, 0x6),
-            Opcode::from(0xDAB6)
-        );
     }
 }
