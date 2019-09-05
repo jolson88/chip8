@@ -38,30 +38,58 @@ impl Instruction {
 /// Represents different opcodes that the Chip-8 can execute.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Opcode {
-    /// *00E0 - CLS. Clear the display.
+    /// *00E0 - CLS*. Clear the display.
     ClearDisplay,
-    /// *00EE - RET. Return from a subroutine.
+    /// *00EE - RET*. Return from a subroutine.
     Return,
-    /// *0nnn - SYS addr. WHile a valid intsruction, this is typically a noop in modern interpreters.
+    /// *0nnn - SYS addr*. WHile a valid intsruction, this is typically a noop in modern interpreters.
     Noop,
-    /// *1nnn - JP addr. Jump to location nnn.
+    /// *1nnn - JP addr*. Jump to location nnn.
     Jump(u16),
-    /// *2nnn - CALL addr. Calls subroutine at nnn.
+    /// *2nnn - CALL addr*. Calls subroutine at nnn.
     CallSubroutine(u16),
-    /// *3xkk - SE Vx, byte. Skip next instruction if Vx = kk.
+    /// *3xkk - SE Vx, byte*. Skip next instruction if Vx = kk.
     SkipIfConstantEqual(Register, u8),
-    /// *4xkk - SNE Vx, byte. Skip next instruction if Vx != kk.
+    /// *4xkk - SNE Vx, byte*. Skip next instruction if Vx != kk.
     SkipIfConstantNotEqual(Register, u8),
-    /// *5xy0 - SE Vx, Vy. Skip next instruction if Vx = Vy.
+    /// *5xy0 - SE Vx, Vy*. Skip next instruction if Vx = Vy.
     SkipIfRegistersEqual(Register, Register),
     /// *6xkk - LD Vx, byte*. Puts the value kk into register Vx.
     LoadConstant(Register, u8),
-    /// *7xkk - ADD Vx, byte. Adds kk to register Vx.
+    /// *7xkk - ADD Vx, byte*. Adds kk to register Vx.
     AddConstant(Register, u8),
+    /// *8xy0 - LD Vx, Vy*. Sets register Vx to value in register Vy.
+    LoadRegister(Register, Register),
+    /// *8xy1 - OR Vx, Vy*. Performs bitwise OR between Vx and Vy, then stores result in Vx.
+    Or(Register, Register),
+    /// *8xy2 - AND Vx, Vy*. Performs bitwise AND between Vx and Vy, then stores result in Vx.
+    And(Register, Register),
+    /// *8xy3 - XOR Vx, Vy*. Performs bitwise XOR between Vx and Vy, then stores result in Vx.
+    Xor(Register, Register),
+    /// *8xy4 - ADD Vx, Vy*. Adds the values of register Vx and Vy together.
+    AddRegister(Register, Register),
+    /// *8xy5 - SUB Vx, Vy*. Subtracts the value of register Vy from register Vx, then stores result in Vx.
+    SubtractRightRegister(Register, Register),
+    /// *8xy6 - SHR Vx*. Shifts the value of register Vx to the right by 1.
+    ShiftRight(Register),
+    /// *8xy7 - SUBN Vx, Vy*. Substracts the value of register Vx from register Vy, then stores result in Vx.
+    SubtractLeftRegister(Register, Register),
+    /// *8xyE - SHL Vx*. Shifts the value of register Vx to the left by 1.
+    ShiftLeft(Register),
+    /// *9xy0 - SNE Vx, Vy*. Skip next instruction if registers Vx and Vy are not equal.
+    SkipIfRegistersNotEqual(Register, Register),
     /// *Annn - LD I, addr*. Sets the value of I register to nnn.
     LoadAddress(u16),
+    /// *Bnnn - JP V0, addr*. Jump to location nnn + V0.
+    JumpPlus(u16),
+    /// *Cxkk - RND Vx, byte*. Generates random number betweeen 0 and 255, AND it with the value kk, then stores result in Vx.
+    Random(Register, u8),
     /// *Dxyn - DRW Vx, Vy, nibble*. Displays n-byte sprite starting at memory location I at (Vx, Vy).
     DisplaySprite(Register, Register, u8),
+    /// *Ex9E - SKP Vx*. Skip next instruction if key with value Vx is pressed.
+    SkipIfPressed(Register),
+    /// *ExA1 - SKNP Vx*. Skip next instruction if key with value Vx is not pressed.
+    SkipIfNotPressed(Register),
     /// *Fx07 - LD Vx, DT*. Placed the value of delay timer into register Vx.
     LoadDelayTimer(Register),
     /// *Fx15 - LD DT, Vx*. Set delay timer = Vx.
@@ -114,9 +142,90 @@ impl From<u16> for Opcode {
                 // 7xkk
                 Opcode::AddConstant(Register::from_u8(inst.x()).unwrap(), inst.kk())
             }
+            0x8 => {
+                match inst.raw() & 0x0F {
+                    0x0 => {
+                        // 8xy0
+                        Opcode::LoadRegister(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x1 => {
+                        // 8xy1
+                        Opcode::Or(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x2 => {
+                        // 8xy2
+                        Opcode::And(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x3 => {
+                        // 8xy3
+                        Opcode::Xor(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x4 => {
+                        // 8xy4
+                        Opcode::AddRegister(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x5 => {
+                        // 8xy5
+                        Opcode::SubtractRightRegister(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0x6 => {
+                        // 8xy6
+                        // TODO: Verify whether it is valid to use Register Y to specify amount to shift by
+                        Opcode::ShiftRight(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x7 => {
+                        // 8xy7
+                        Opcode::SubtractLeftRegister(
+                            Register::from_u8(inst.x()).unwrap(),
+                            Register::from_u8(inst.y()).unwrap(),
+                        )
+                    }
+                    0xE => {
+                        // 8xyE
+                        // TODO: Verify whether it is valid to use Register Y to specify amount to shift by
+                        Opcode::ShiftLeft(Register::from_u8(inst.x()).unwrap())
+                    }
+                    _ => {
+                        panic!("Instruction not recognized: {:X}", inst.raw());
+                    }
+                }
+            }
+            0x9 => {
+                // 9xy0
+                Opcode::SkipIfRegistersNotEqual(
+                    Register::from_u8(inst.x()).unwrap(),
+                    Register::from_u8(inst.y()).unwrap(),
+                )
+            }
             0xA => {
                 // Annn
                 Opcode::LoadAddress(inst.nnn())
+            }
+            0xB => {
+                // Bnnn
+                Opcode::JumpPlus(inst.nnn())
+            }
+            0xC => {
+                // Cxkk
+                Opcode::Random(Register::from_u8(inst.x()).unwrap(), inst.kk())
             }
             0xD => {
                 // Dxyn
@@ -125,6 +234,21 @@ impl From<u16> for Opcode {
                     Register::from_u8(inst.y()).unwrap(),
                     inst.n(),
                 )
+            }
+            0xE => {
+                match inst.raw() & 0xFF {
+                    0x9E => {
+                        // Ex9E
+                        Opcode::SkipIfPressed(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0xA1 => {
+                        // ExA1
+                        Opcode::SkipIfNotPressed(Register::from_u8(inst.x()).unwrap())
+                    }
+                    _ => {
+                        panic!("Instruction not recognized: {:X}", inst.raw());
+                    }
+                }
             }
             0xF => {
                 // lo byte represents the next opcode information
@@ -180,6 +304,13 @@ mod tests {
             Opcode::SkipIfRegistersEqual(Register::VA, Register::VD),
             Opcode::from(0x5AD0)
         );
+        assert_eq!(
+            Opcode::SkipIfRegistersNotEqual(Register::V1, Register::V4),
+            Opcode::from(0x9140)
+        );
+        assert_eq!(Opcode::JumpPlus(0x17A), Opcode::from(0xB17A));
+        assert_eq!(Opcode::SkipIfPressed(Register::V9), Opcode::from(0xE99E));
+        assert_eq!(Opcode::SkipIfNotPressed(Register::VE), Opcode::from(0xEEA1));
     }
 
     #[test]
@@ -193,6 +324,10 @@ mod tests {
             Opcode::from(0x60FF)
         );
         assert_eq!(Opcode::LoadAddress(0x2EA), Opcode::from(0xA2EA));
+        assert_eq!(
+            Opcode::LoadRegister(Register::V1, Register::V2),
+            Opcode::from(0x8120)
+        );
     }
 
     #[test]
@@ -201,6 +336,30 @@ mod tests {
             Opcode::AddConstant(Register::V2, 0x3B),
             Opcode::from(0x723B)
         );
+        assert_eq!(Opcode::Or(Register::V8, Register::VA), Opcode::from(0x88A1));
+        assert_eq!(
+            Opcode::And(Register::V1, Register::V3),
+            Opcode::from(0x8132)
+        );
+        assert_eq!(
+            Opcode::Xor(Register::V5, Register::VC),
+            Opcode::from(0x85C3)
+        );
+        assert_eq!(
+            Opcode::AddRegister(Register::V4, Register::V5),
+            Opcode::from(0x8454)
+        );
+        assert_eq!(
+            Opcode::SubtractRightRegister(Register::V2, Register::VA),
+            Opcode::from(0x82A5)
+        );
+        assert_eq!(Opcode::ShiftRight(Register::V7), Opcode::from(0x8716));
+        assert_eq!(
+            Opcode::SubtractLeftRegister(Register::VA, Register::VC),
+            Opcode::from(0x8AC7)
+        );
+        assert_eq!(Opcode::ShiftLeft(Register::V7), Opcode::from(0x87AE));
+        assert_eq!(Opcode::Random(Register::V4, 0x14), Opcode::from(0xC414));
     }
 
     #[test]
