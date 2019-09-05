@@ -92,8 +92,22 @@ pub enum Opcode {
     SkipIfNotPressed(Register),
     /// *Fx07 - LD Vx, DT*. Placed the value of delay timer into register Vx.
     LoadDelayTimer(Register),
+    /// *Fx0A - LD Vx, K*. Wait for a key press, store the value in register Vx.
+    WaitForPress(Register),
     /// *Fx15 - LD DT, Vx*. Set delay timer = Vx.
     SetDelayTimer(Register),
+    /// *Fx18 - LD ST, Vx*. Set sound timer = Vx.
+    SetSoundTimer(Register),
+    /// *Fx1E - ADD I, Vx*. The values of I and register Vx are added, then stores result in Vx.
+    AddAddress(Register),
+    /// *Fx29 - LD F, Vx*. The value of I is set to the location of sprite for digit Vx.
+    LoadAddressOfSprite(Register),
+    /// *Fx33 - LD B, Vx*. Store BCD representation of Vx in addresses I, I+1, and I+2.
+    LoadDigits(Register),
+    /// *Fx55 - LD [I], Vx*. Store registers V0 through Vx in memory starting at location I.
+    StoreRegisters(Register),
+    /// *Fx65 - LD Vx, [I]*. Load registers V0 through Vx from memory starting at location I.
+    LoadRegisters(Register),
 }
 
 impl From<u16> for Opcode {
@@ -257,9 +271,37 @@ impl From<u16> for Opcode {
                         // Fx07
                         Opcode::LoadDelayTimer(Register::from_u8(inst.x()).unwrap())
                     }
+                    0x0A => {
+                        // Fx0A
+                        Opcode::WaitForPress(Register::from_u8(inst.x()).unwrap())
+                    }
                     0x15 => {
                         // Fx15
                         Opcode::SetDelayTimer(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x18 => {
+                        // Fx18
+                        Opcode::SetSoundTimer(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x1E => {
+                        // Fx1E
+                        Opcode::AddAddress(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x29 => {
+                        // Fx29
+                        Opcode::LoadAddressOfSprite(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x33 => {
+                        // Fx33
+                        Opcode::LoadDigits(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x55 => {
+                        // Fx55
+                        Opcode::StoreRegisters(Register::from_u8(inst.x()).unwrap())
+                    }
+                    0x65 => {
+                        // Fx65
+                        Opcode::LoadRegisters(Register::from_u8(inst.x()).unwrap())
                     }
                     _ => {
                         panic!("Instruction not recognized: {:X}", inst.raw());
@@ -283,6 +325,10 @@ mod tests {
         assert_eq!(
             Opcode::DisplaySprite(Register::VA, Register::VB, 0x6),
             Opcode::from(0xDAB6)
+        );
+        assert_eq!(
+            Opcode::LoadAddressOfSprite(Register::V4),
+            Opcode::from(0xF429)
         );
     }
 
@@ -311,10 +357,11 @@ mod tests {
         assert_eq!(Opcode::JumpPlus(0x17A), Opcode::from(0xB17A));
         assert_eq!(Opcode::SkipIfPressed(Register::V9), Opcode::from(0xE99E));
         assert_eq!(Opcode::SkipIfNotPressed(Register::VE), Opcode::from(0xEEA1));
+        assert_eq!(Opcode::WaitForPress(Register::VA), Opcode::from(0xFA0A));
     }
 
     #[test]
-    fn parses_load_opcodes() {
+    fn parses_memory_opcodes() {
         assert_eq!(
             Opcode::LoadConstant(Register::VA, 0x02),
             Opcode::from(0x6A02)
@@ -328,6 +375,9 @@ mod tests {
             Opcode::LoadRegister(Register::V1, Register::V2),
             Opcode::from(0x8120)
         );
+        assert_eq!(Opcode::LoadDigits(Register::VA), Opcode::from(0xFA33));
+        assert_eq!(Opcode::StoreRegisters(Register::V9), Opcode::from(0xF955));
+        assert_eq!(Opcode::LoadRegisters(Register::VD), Opcode::from(0xFD65));
     }
 
     #[test]
@@ -360,11 +410,13 @@ mod tests {
         );
         assert_eq!(Opcode::ShiftLeft(Register::V7), Opcode::from(0x87AE));
         assert_eq!(Opcode::Random(Register::V4, 0x14), Opcode::from(0xC414));
+        assert_eq!(Opcode::AddAddress(Register::V8), Opcode::from(0xF81E));
     }
 
     #[test]
     fn parses_timer_opcodes() {
         assert_eq!(Opcode::SetDelayTimer(Register::V0), Opcode::from(0xF015));
         assert_eq!(Opcode::LoadDelayTimer(Register::V0), Opcode::from(0xF007));
+        assert_eq!(Opcode::SetSoundTimer(Register::V3), Opcode::from(0xF318));
     }
 }
