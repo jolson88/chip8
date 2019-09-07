@@ -1,4 +1,4 @@
-use crate::cpu::Register;
+use crate::chip8::Register;
 use num_traits::FromPrimitive;
 use std::convert::From;
 
