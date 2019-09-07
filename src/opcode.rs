@@ -26,8 +26,8 @@ impl Instruction {
         (self.0 & 0xFF) as u8
     }
 
-    pub fn nnn(&self) -> u16 {
-        self.0 & 0xFFF
+    pub fn nnn(&self) -> usize {
+        (self.0 & 0xFFF) as usize
     }
 
     pub fn n(&self) -> u8 {
@@ -45,9 +45,9 @@ pub enum Opcode {
     /// *0nnn - SYS addr*. WHile a valid intsruction, this is typically a noop in modern interpreters.
     Noop,
     /// *1nnn - JP addr*. Jump to location nnn.
-    Jump(u16),
+    Jump(usize),
     /// *2nnn - CALL addr*. Calls subroutine at nnn.
-    CallSubroutine(u16),
+    CallSubroutine(usize),
     /// *3xkk - SE Vx, byte*. Skip next instruction if Vx = kk.
     SkipIfConstantEqual(Register, u8),
     /// *4xkk - SNE Vx, byte*. Skip next instruction if Vx != kk.
@@ -79,9 +79,9 @@ pub enum Opcode {
     /// *9xy0 - SNE Vx, Vy*. Skip next instruction if registers Vx and Vy are not equal.
     SkipIfRegistersNotEqual(Register, Register),
     /// *Annn - LD I, addr*. Sets the value of I register to nnn.
-    LoadAddress(u16),
+    LoadAddress(usize),
     /// *Bnnn - JP V0, addr*. Jump to location nnn + V0.
-    JumpPlus(u16),
+    JumpPlus(usize),
     /// *Cxkk - RND Vx, byte*. Generates random number betweeen 0 and 255, AND it with the value kk, then stores result in Vx.
     Random(Register, u8),
     /// *Dxyn - DRW Vx, Vy, nibble*. Displays n-byte sprite starting at memory location I at (Vx, Vy).

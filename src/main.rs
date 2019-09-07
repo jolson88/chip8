@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             *i = 0x99_00_00;
         }
 
-        chip8.tick();
+        chip8.tick()?;
         window.update_with_buffer(&buffer)?;
     }
 
