@@ -1,4 +1,5 @@
 use crate::opcode::Opcode;
+use std::cmp::max;
 
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
@@ -85,7 +86,8 @@ impl Chip8 {
     }
 
     pub fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // TODO(jolson): Count down sound and delay timers
+        self.delay_timer = max(self.delay_timer - 1, 0);
+        self.sound_timer = max(self.sound_timer - 1, 0);
 
         // Similar to EAP register in x86, we will increment PC counter after retrieval
         // but before execution. This will help make it more straightforward for branch

@@ -11,10 +11,14 @@ use minifb::{Key, Scale, Window, WindowOptions};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::time::Instant;
 
 const WIDTH: usize = 640;
 const HEIGHT: usize = 320;
 const PIXEL_SIZE: usize = 10;
+const CLOCK_SPEED: u32 = 600;
+/// The ideal frame duration in nanoseconds at the desired CLOCK_SPEED
+const FRAME_DURATION_NS: u128 = 1_000_000_000 / CLOCK_SPEED as u128;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load program from file
@@ -39,6 +43,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
 
+    let mut last_update = Instant::now();
+    let mut elapsed_ns: u128 = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         for y in 0..(HEIGHT / PIXEL_SIZE) {
             for x in 0..(WIDTH / PIXEL_SIZE) {
@@ -54,10 +60,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        chip8.tick()?;
-        window.update_with_buffer(&buffer)?;
+        // Run Chip-8 emulator at CLOCK_SPEED (60hz by default)
+        // We do this by keeping a timer (elapsed_ns) of how many nanoseconds have elapsed.
+        // Once enough nanoseconds have elapsed for a "tick", we run the tick. Any leftover
+        // nanoseconds are carried over so that even if the loop timing is inconsistent, the
+        // clock rate will largely remain fairly stable.
+        let now = Instant::now();
+        elapsed_ns += now.duration_since(last_update).as_nanos();
+        let tick_count = elapsed_ns / FRAME_DURATION_NS as u128;
+        for _ in 0..tick_count {
+            chip8.tick()?;
+        }
 
-        // TODO(jolson): Print "FPS" to stdout
+        window.update_with_buffer(&buffer)?;
+        elapsed_ns %= FRAME_DURATION_NS;
+        last_update = now; 
     }
 
     Ok(())
