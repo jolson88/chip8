@@ -13,7 +13,8 @@ use std::fs::File;
 use std::io::prelude::*;
 
 const WIDTH: usize = 640;
-const HEIGHT: usize = 360;
+const HEIGHT: usize = 320;
+const PIXEL_SIZE: usize = 10;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load program from file
@@ -39,12 +40,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        for i in buffer.iter_mut() {
-            *i = 0x99_00_00;
+        for y in 0..(HEIGHT / PIXEL_SIZE) {
+            for x in 0..(WIDTH / PIXEL_SIZE) {
+                let pixel = chip8.get_pixel(x, y);
+                // Fill in all the pixels necessary (we are effectively "zoom in" via PIXEL_SIZE)
+                for j in 0..PIXEL_SIZE {
+                    for i in 0..PIXEL_SIZE {
+                        let dest_x = x * PIXEL_SIZE + i;
+                        let dest_y = y * PIXEL_SIZE + j;
+                        buffer[dest_y * WIDTH + dest_x] = 0xFF_FF_FF * u32::from(pixel);
+                    }
+                }
+            }
         }
 
         chip8.tick()?;
         window.update_with_buffer(&buffer)?;
+
+        // TODO(jolson): Print "FPS" to stdout
     }
 
     Ok(())
