@@ -2,6 +2,7 @@
 extern crate enum_primitive_derive;
 extern crate minifb;
 extern crate num_traits;
+extern crate rand;
 
 mod chip8;
 mod opcode;

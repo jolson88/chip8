@@ -26,6 +26,8 @@ pub struct Chip8 {
     pc: usize,
     stack: Vec<usize>,
     i_addr: usize,
+    delay_timer: u8,
+    sound_timer: u8,
 }
 
 impl Default for Chip8 {
@@ -36,6 +38,8 @@ impl Default for Chip8 {
             pc: 0x200,
             stack: Vec::new(),
             i_addr: 0,
+            delay_timer: 0,
+            sound_timer: 0,
         }
     }
 }
@@ -47,6 +51,8 @@ impl Chip8 {
     }
 
     pub fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // TODO(jolson): Count down sound and delay timers
+
         // Similar to EAP register in x86, we will increment PC counter after retrieval
         // but before execution. This will help make it more straightforward for branch
         // instructions to "skip next instruction" by incrementing a single two-byte instruction.
@@ -75,93 +81,127 @@ impl Chip8 {
                     .ok_or_else(|| "Tried to return from empty stack")?;
                 self.pc = sp;
             }
-            Opcode::Jump(_nnn) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::Jump(nnn) => {
+                self.pc = nnn;
             }
             Opcode::CallSubroutine(nnn) => {
                 self.stack.push(self.pc);
                 self.pc = nnn;
             }
-            Opcode::SkipIfConstantEqual(_vx, _kk) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SkipIfConstantEqual(vx, kk) => {
+                if self.reg[vx as usize] == kk {
+                    self.pc += 2;
+                }
             }
-            Opcode::SkipIfConstantNotEqual(_vx, _kk) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SkipIfConstantNotEqual(vx, kk) => {
+                if self.reg[vx as usize] != kk {
+                    self.pc += 2;
+                }
             }
-            Opcode::SkipIfRegistersEqual(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SkipIfRegistersEqual(vx, vy) => {
+                if self.reg[vx as usize] == self.reg[vy as usize] {
+                    self.pc += 2;
+                }
             }
             Opcode::LoadConstant(vx, kk) => {
                 self.reg[vx as usize] = kk;
             }
-            Opcode::AddConstant(_vx, _kk) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::AddConstant(vx, kk) => {
+                self.reg[vx as usize] += kk;
             }
-            Opcode::LoadRegister(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::LoadRegister(vx, vy) => {
+                self.reg[vx as usize] = self.reg[vy as usize];
             }
-            Opcode::Or(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::Or(vx, vy) => {
+                self.reg[vx as usize] |= self.reg[vy as usize];
             }
-            Opcode::And(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::And(vx, vy) => {
+                self.reg[vx as usize] &= self.reg[vy as usize];
             }
-            Opcode::Xor(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::Xor(vx, vy) => {
+                self.reg[vx as usize] ^= self.reg[vy as usize];
             }
-            Opcode::AddRegister(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::AddRegister(vx, vy) => {
+                let vx16 = u16::from(self.reg[vx as usize]);
+                let vy16 = u16::from(self.reg[vy as usize]);
+                let val = vx16 + vy16;
+                if val > 255 {
+                    self.reg[Register::VF as usize] = 1;
+                }
+                self.reg[vx as usize] = (val & 0xFF) as u8;
             }
-            Opcode::SubtractRightRegister(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SubtractRightRegister(vx, vy) => {
+                let vx_val = self.reg[vx as usize];
+                let vy_val = self.reg[vy as usize];
+                if vx_val > vy_val {
+                    self.reg[Register::VF as usize] = 1;
+                }
+                self.reg[vx as usize] = vx_val - vy_val;
             }
-            Opcode::ShiftRight(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::ShiftRight(vx) => {
+                let vx_val = self.reg[vx as usize];
+                if vx_val & 0x01 == 1 {
+                    // Lease significant bit of 1 was shifted off, signal in VF register
+                    self.reg[Register::VF as usize] = 1;
+                }
+                self.reg[vx as usize] = vx_val >> 1;
             }
-            Opcode::SubtractLeftRegister(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SubtractLeftRegister(vx, vy) => {
+                let vx_val = self.reg[vx as usize];
+                let vy_val = self.reg[vy as usize];
+                if vy_val > vx_val {
+                    self.reg[Register::VF as usize] = 1;
+                }
+                self.reg[vx as usize] = vy_val - vx_val;
             }
-            Opcode::ShiftLeft(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::ShiftLeft(vx) => {
+                let vx_val = self.reg[vx as usize];
+                if vx_val & 0b1000_0000 == 0b1000_0000 {
+                    // Most significant bit of 1 was shifted off, signal in VF register
+                    self.reg[Register::VF as usize] = 1;
+                }
+                self.reg[vx as usize] = vx_val << 1;
             }
-            Opcode::SkipIfRegistersNotEqual(_vx, _vy) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SkipIfRegistersNotEqual(vx, vy) => {
+                if self.reg[vx as usize] != self.reg[vy as usize] {
+                    self.pc += 2;
+                }
             }
             Opcode::LoadAddress(nnn) => {
                 self.i_addr = nnn;
             }
-            Opcode::JumpPlus(_nnn) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::JumpPlus(nnn) => {
+                self.pc = self.reg[Register::V0 as usize] as usize + nnn;
             }
-            Opcode::Random(_vx, _kk) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::Random(vx, kk) => {
+                self.reg[vx as usize] = rand::random::<u8>() & kk;
             }
             Opcode::DisplaySprite(_vx, _vy, _n) => {
                 // TODO(jolson): Implement sprite drawing
             }
             Opcode::SkipIfPressed(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+                // TODO(jolson): Implement input
             }
             Opcode::SkipIfNotPressed(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+                // TODO(jolson): Implement input
             }
-            Opcode::LoadDelayTimer(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::LoadDelayTimer(vx) => {
+                self.reg[vx as usize] = self.delay_timer;
             }
             Opcode::WaitForPress(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+                // TODO(jolson): Implement input
             }
-            Opcode::SetDelayTimer(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SetDelayTimer(vx) => {
+                self.delay_timer = self.reg[vx as usize];    
             }
-            Opcode::SetSoundTimer(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::SetSoundTimer(vx) => {
+                self.sound_timer = self.reg[vx as usize];
             }
-            Opcode::AddAddress(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+            Opcode::AddAddress(vx) => {
+                self.i_addr += self.reg[vx as usize] as usize;
             }
             Opcode::LoadAddressOfSprite(_vx) => {
-                unimplemented!("Opcode not implemented yet: {:?}", op);
+                // TODO(jolson): Implement built-in sprites)
             }
             Opcode::LoadDigits(vx) => {
                 let val = self.reg[vx as usize];
