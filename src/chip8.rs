@@ -54,6 +54,8 @@ pub struct Chip8 {
     delay_timer: u8,
     sound_timer: u8,
     screen: Box<[u8; SCREEN_WIDTH * SCREEN_HEIGHT]>,
+    key_status: [bool; 16],
+    waiting_for_key: Option<Register>,
 }
 
 impl Default for Chip8 {
@@ -67,6 +69,8 @@ impl Default for Chip8 {
             delay_timer: 0,
             sound_timer: 0,
             screen: Box::new([0u8; SCREEN_WIDTH * SCREEN_HEIGHT]),
+            key_status: [false; 16],
+            waiting_for_key: None,
         };
 
         // Load system font. 16 characters, each 5 bytes long
@@ -101,6 +105,28 @@ impl Chip8 {
 
     pub fn get_pixel(&self, x: usize, y: usize) -> u8 {
         self.screen[y * SCREEN_WIDTH + x]
+    }
+
+    pub fn set_key_down(&mut self, key: u8) {
+        if key > 15 {
+            panic!("Key is not between 0 and 15: {}", key);
+        }
+        // Is this a new key press?
+        if !self.key_status[key as usize] {
+            // Are we waiting for a key press?
+            if self.waiting_for_key.is_some() {
+                self.reg[self.waiting_for_key.unwrap() as usize] = key;
+                self.waiting_for_key = None;
+            }
+            self.key_status[key as usize] = true;
+        }
+    }
+
+    pub fn set_key_up(&mut self, key: u8) {
+        if key > 15 {
+            panic!("Key is not between 0 and 15: {}", key);
+        }
+        self.key_status[key as usize] = false;
     }
 
     // Optimistically execute opcode. For the sake of this emulator, we just let the Vecs panic!
@@ -245,17 +271,21 @@ impl Chip8 {
                     self.reg[Register::VF as usize] = 1;
                 }
             }
-            Opcode::SkipIfPressed(_vx) => {
-                // TODO(jolson): Implement input
+            Opcode::SkipIfPressed(vx) => {
+                if self.key_status[self.reg[vx as usize] as usize] {
+                    self.pc += 2;
+                }
             }
-            Opcode::SkipIfNotPressed(_vx) => {
-                // TODO(jolson): Implement input
+            Opcode::SkipIfNotPressed(vx) => {
+                if !self.key_status[self.reg[vx as usize] as usize] {
+                    self.pc += 2;
+                }
             }
             Opcode::LoadDelayTimer(vx) => {
                 self.reg[vx as usize] = self.delay_timer;
             }
-            Opcode::WaitForPress(_vx) => {
-                // TODO(jolson): Implement input
+            Opcode::WaitForPress(vx) => {
+                self.waiting_for_key = Some(vx);
             }
             Opcode::SetDelayTimer(vx) => {
                 self.delay_timer = self.reg[vx as usize];

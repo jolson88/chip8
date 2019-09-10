@@ -16,7 +16,7 @@ use std::time::Instant;
 const WIDTH: usize = 640;
 const HEIGHT: usize = 320;
 const PIXEL_SIZE: usize = 10;
-const CLOCK_SPEED: u32 = 600;
+const CLOCK_SPEED: u32 = 60;
 /// The ideal frame duration in nanoseconds at the desired CLOCK_SPEED
 const FRAME_DURATION_NS: u128 = 1_000_000_000 / CLOCK_SPEED as u128;
 
@@ -43,13 +43,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
 
+    // Chip-8 uses a hex keyboard:
+    // 1 2 3 C
+    // 4 5 6 D
+    // 7 8 9 E
+    // A 0 B F
+    // Map values from 1-3, Q-E, etc. to the keyboard above, in order from 0..F
+    #[rustfmt::skip]
+    let mut key_map = [Key::X, Key::Key1, Key::Key2, Key::Key3, 
+        Key::Q, Key::W, Key::E,
+        Key::A, Key::S, Key::D,
+        Key::Z, Key::C,
+        Key::Key4, Key::R, Key::F, Key::V];
+
+    // Start update loop
     let mut last_update = Instant::now();
     let mut elapsed_ns: u128 = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        for (i, k) in key_map.iter_mut().enumerate() {
+            if window.is_key_down(*k) {
+                chip8.set_key_down(i as u8);
+            } else {
+                chip8.set_key_up(i as u8);
+            }
+        }
+
         for y in 0..(HEIGHT / PIXEL_SIZE) {
             for x in 0..(WIDTH / PIXEL_SIZE) {
                 let pixel = chip8.get_pixel(x, y);
-                // Fill in all the pixels necessary (we are effectively "zoom in" via PIXEL_SIZE)
+                // Fill in all the pixels necessary (we are effectively "zooming in" via PIXEL_SIZE)
                 for j in 0..PIXEL_SIZE {
                     for i in 0..PIXEL_SIZE {
                         let dest_x = x * PIXEL_SIZE + i;
@@ -74,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         window.update_with_buffer(&buffer)?;
         elapsed_ns %= FRAME_DURATION_NS;
-        last_update = now; 
+        last_update = now;
     }
 
     Ok(())
